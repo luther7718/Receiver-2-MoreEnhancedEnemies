@@ -52,6 +52,10 @@ namespace EnhancedEnemies.Patches
         [HarmonyPatch(typeof(TurretScript), nameof(TurretScript.Start))]
         static void TurretSetup(TurretScript __instance)
         {
+            if ((ReceiverCoreScript.Instance().game_mode.GetGameMode() != GameMode.RankingCampaign)
+                && !Plugin.EnableClassic.Value)
+                return;
+
             int shotgunWeight = ShotgunTurrets.enabled.Value ? ShotgunTurrets.weight.Value : 0;
             int lancerWeight = LancerTurrets.enabled.Value ? LancerTurrets.weight.Value : 0;
             int random = (int) (Random(TurretSeed(__instance), "Turret Main") * (weight.Value + shotgunWeight + lancerWeight));
@@ -871,6 +875,10 @@ namespace EnhancedEnemies.Patches
         [HarmonyPatch(typeof(ShockDrone), "Start")]
         static void DroneSetup(ShockDrone __instance)
         {
+            if ((ReceiverCoreScript.Instance().game_mode.GetGameMode() != GameMode.RankingCampaign)
+                && !Plugin.EnableClassic.Value)
+                return;
+
             cameraToDrone[__instance.camera_part] = __instance;
             oscillatorToDrone[__instance.oscillator_part] = __instance;
             motorToDrone[__instance.motor_part] = __instance;
@@ -1028,11 +1036,10 @@ namespace EnhancedEnemies.Patches
         [HarmonyPatch(typeof(OscillatorPart), "UpdateCameraMovement")]
         static bool StopCameraWhileAsleep(OscillatorPart __instance, ref float ___angle, float ___speed)
         {
-            if (!oscillatorToDrone.ContainsKey(__instance))
+            if (!oscillatorToDrone.TryGetValue(__instance, out ShockDrone drone))
             {
                 return true;
             }
-            ShockDrone drone = oscillatorToDrone[__instance];
             ShockDroneState state = state_access(drone);
             if (state == ShockDroneState.Standby ||
             (state == ShockDroneState.Idle && wakeUpTimers.ContainsKey(drone)))
@@ -1094,7 +1101,8 @@ namespace EnhancedEnemies.Patches
         [HarmonyPatch(typeof(MotorPart), "UpdateSound")]
         static void ModSleepNoise(MotorPart __instance)
         {
-            ShockDrone drone = motorToDrone[__instance];
+            if (!motorToDrone.TryGetValue(__instance, out ShockDrone drone))
+                return;
             if (state_access(drone) == ShockDroneState.Standby)
             {
                 FMOD.Studio.EventInstance eim = event_instance_motor_access(__instance);
@@ -1114,7 +1122,8 @@ namespace EnhancedEnemies.Patches
         [HarmonyPatch(typeof(MotorPart), "FixedUpdate")]
         static bool UpdateRotorWhileAsleep(MotorPart __instance)
         {
-            ShockDrone drone = motorToDrone[__instance];
+            if (!motorToDrone.TryGetValue(__instance, out ShockDrone drone))
+                return true;
             //Plugin.Logger.LogInfo($"{__instance.Throttle} {__instance.Velocity.magnitude}");
             if (state_access(drone) == ShockDroneState.Standby && grounded.Contains(drone))
             {
@@ -1170,6 +1179,10 @@ namespace EnhancedEnemies.Patches
         [HarmonyPatch(typeof(SecurityCamera), "Start")]
         static void SetupSecurityCamera(SecurityCamera __instance, ref SecurityCameraState ___state)
         {
+            if ((ReceiverCoreScript.Instance().game_mode.GetGameMode() != GameMode.RankingCampaign)
+               && !Plugin.EnableClassic.Value)
+                return;
+
             if (startAsleepEnabled.Value && UnityEngine.Random.value < startAsleepChance.Value)
             {
 			    __instance.light_part.SetTargetLightMode(LightPart.LightMode.Standby, false);

@@ -3,6 +3,7 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using EnhancedEnemies.Patches;
 using HarmonyLib;
+using Receiver2;
 
 namespace EnhancedEnemies;
 
@@ -11,6 +12,7 @@ public class Plugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
     private static Harmony _harmony;
+    public static ConfigEntry<bool> EnableClassic;
 
     private void Awake()
     {
@@ -320,6 +322,12 @@ public class Plugin : BaseUnityPlugin
             new ConfigDefinition("Security Camera Link", "Cameras enabled"),
             true,
             new ConfigDescription("Enables security cameras to activate through other security cameras (they still need their own camera though)")
+        );
+/////////////////////////////////////////////////////////////////////////////////////////////////
+        EnableClassic = Config.Bind(
+            new ConfigDefinition("Classic Mode", "Enabled"),
+            false,
+            new ConfigDescription("Spawn enhanced enemies in the Receiver 1 arcade cabinet")
         );
 
         _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
