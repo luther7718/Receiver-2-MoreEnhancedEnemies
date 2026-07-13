@@ -439,7 +439,7 @@ namespace EnhancedEnemies.Patches
             {
                 Label endIf = il.DefineLabel();
                 //IL_038E
-                if (codes[i + 1].opcode == OpCodes.Ldfld && ((FieldInfo)codes[i + 1].operand) == AccessTools.Field(typeof(BallisticProperties), nameof(BallisticProperties.hollow)))
+                if (codes[i+1].opcode == OpCodes.Ldfld && ((FieldInfo)codes[i+1].operand) == AccessTools.Field(typeof(BallisticProperties), nameof(BallisticProperties.hollow)))
                 {
                     yield return new CodeInstruction(OpCodes.Ldarg_1);
                     yield return new CodeInstruction(OpCodes.Box, typeof(CartridgeSpec));
@@ -460,7 +460,7 @@ namespace EnhancedEnemies.Patches
                 Label endIf = il.DefineLabel();
                 //IL_06ED
                 if (codes[i].opcode == OpCodes.Ldloc_1
-                && codes[i + 1].opcode == OpCodes.Ldloc_S && ((LocalBuilder)codes[i + 1].operand).LocalIndex == 35)
+                && codes[i+1].opcode == OpCodes.Ldloc_S && ((LocalBuilder)codes[i+1].operand).LocalIndex == 35)
                 {
                     yield return codes[i++];
                     yield return new CodeInstruction(OpCodes.Ldarg_1);
@@ -481,7 +481,7 @@ namespace EnhancedEnemies.Patches
             {
                 //Label endIf = il.DefineLabel();
                 //IL_082C
-                if (codes[i + 1].opcode == OpCodes.Stloc_S && ((LocalBuilder)codes[i + 1].operand).LocalIndex == 39)
+                if (codes[i+1].opcode == OpCodes.Stloc_S && ((LocalBuilder)codes[i+1].operand).LocalIndex == 39)
                 {
                     yield return codes[i++].WithLabels([bypassRicochet]);
                     yield return codes[i++];
@@ -511,7 +511,7 @@ namespace EnhancedEnemies.Patches
             for (; i < codes.Count; i++)
             {
                 //IL_0E38
-                if (codes[i + 4].opcode == OpCodes.Ldloc_S && ((LocalBuilder)codes[i + 4].operand).LocalIndex == 56)
+                if (codes[i+4].opcode == OpCodes.Ldloc_S && ((LocalBuilder)codes[i+4].operand).LocalIndex == 56)
                 {
                     yield return new CodeInstruction(OpCodes.Ldarg_1);
                     yield return new CodeInstruction(OpCodes.Box, typeof(CartridgeSpec));
@@ -855,7 +855,7 @@ namespace EnhancedEnemies.Patches
         //internal static object cached_raycasts_access = AccessTools.Method(typeof(AccessTools), nameof(AccessTools.FieldRefAccess), [typeof(string)], [typeof(SensorPart),cr])/*.MakeGenericMethod(typeof(SensorPart),cr)*/.Invoke(null, ["cached_raycasts"]);
         internal static AccessTools.FieldRef<ShockDrone, ShockDroneState> state_access = AccessTools.FieldRefAccess<ShockDrone, ShockDroneState>("state");
         internal static AccessTools.FieldRef<MotorPart, FMOD.Studio.EventInstance> event_instance_motor_access = AccessTools.FieldRefAccess<MotorPart, FMOD.Studio.EventInstance>("event_instance_motor");
-        internal static MethodInfo throttle_set_access = AccessTools.PropertySetter(typeof(MotorPart), nameof(MotorPart.Throttle));
+        internal static MethodInfo throttle_set_access = AccessTools.PropertySetter(typeof(MotorPart),nameof(MotorPart.Throttle));
         internal static ConfigEntry<bool> startAsleepEnabled;
         internal static ConfigEntry<float> startAsleepChance;
         internal static ConfigEntry<float> wakeupDelay;
@@ -950,7 +950,7 @@ namespace EnhancedEnemies.Patches
         {
             // wakeup from being kicked
             if (__instance.camera_part.Alive &&
-                ((__instance.motor_part.Velocity.magnitude > 3.5f &&
+                ((__instance.motor_part.Velocity.magnitude > 3.5f && 
                     Vector3.Angle(__instance.motor_part.Velocity, __instance.motor_part.TargetPosition - __instance.motor_part.transform.position) > 45f) ||
                 (__instance.motor_part.Throttle < .1f) &&
                     __instance.motor_part.Velocity.magnitude > .8f &&
@@ -1134,7 +1134,7 @@ namespace EnhancedEnemies.Patches
                     if (Vector3.Distance(drone.transform.position, __instance.TargetPosition) < .1f &&
                         __instance.Velocity.magnitude < .5f)
                     {
-                        throttle_set_access.Invoke(__instance, [0]);
+                        throttle_set_access.Invoke(__instance,[0]);
                         return false;
                     }
                 }
@@ -1164,7 +1164,7 @@ namespace EnhancedEnemies.Patches
     {
         private static Dictionary<SecurityCamera, float> wakeUpTimers = new Dictionary<SecurityCamera, float>();
         private static Dictionary<SecurityCamera, float> sleepTimers = new Dictionary<SecurityCamera, float>();
-        internal static MethodInfo CanSeePlayerAccess = AccessTools.PropertyGetter(typeof(SecurityCamera), "CanSeePlayer");
+        internal static MethodInfo CanSeePlayerAccess = AccessTools.PropertyGetter(typeof(SecurityCamera),"CanSeePlayer");
         internal static ConfigEntry<bool> startAsleepEnabled;
         internal static ConfigEntry<float> startAsleepChance;
         internal static ConfigEntry<float> wakeupDelay;
@@ -1316,7 +1316,7 @@ namespace EnhancedEnemies.Patches
 
         private static FieldInfo camera_part_drone_access = AccessTools.Field(typeof(ShockDrone), "camera_part");
         private static FieldInfo camera_part_camera_access = AccessTools.Field(typeof(SecurityCamera), "camera_part");
-        private static MethodInfo get_componenet_camera = AccessTools.Method(typeof(GameObject), nameof(GameObject.GetComponent), generics: [typeof(SecurityCamera)]);
+        private static MethodInfo get_componenet_camera = AccessTools.Method(typeof(GameObject),nameof(GameObject.GetComponent),generics: [typeof(SecurityCamera)]);
         private static FieldInfo enemy_access = AccessTools.Field(typeof(ActiveEnemy), "enemy");
 
         [HarmonyPrefix]
