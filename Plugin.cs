@@ -3,6 +3,7 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using EnhancedEnemies.Patches;
 using HarmonyLib;
+using Receiver2;
 
 namespace EnhancedEnemies;
 
@@ -11,6 +12,7 @@ public class Plugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
     private static Harmony _harmony;
+    public static ConfigEntry<bool> EnableClassic;
 
     private void Awake()
     {
@@ -334,6 +336,18 @@ public class Plugin : BaseUnityPlugin
             true,
             new ConfigDescription("Enables security cameras to activate through other security cameras (they still need their own camera though)")
         );
+/////////////////////////////////////////////////////////////////////////////////////////////////
+        GreenDemonSpawner.demonEnabled = Config.Bind(
+            new ConfigDefinition("Green Demon Mode", "Green Demon enabled"),
+            false,
+            new ConfigDescription("Try to rank up while evading a slow but invincible shock drone that can phase through walls")
+        );
+/////////////////////////////////////////////////////////////////////////////////////////////////
+        EnableClassic = Config.Bind(
+            new ConfigDefinition("Classic Mode", "Enhanced Enemies in Classic"),
+            false,
+            new ConfigDescription("Spawn enhanced enemies in the Receiver 1 arcade cabinet")
+        );
 
         _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
         //_harmony.PatchAll(typeof(MyopicTurrets));
@@ -347,6 +361,7 @@ public class Plugin : BaseUnityPlugin
         _harmony.PatchAll(typeof(SleepyDrones));
         _harmony.PatchAll(typeof(SleepySecurityCameras));
         _harmony.PatchAll(typeof(SecurityCameraLinkedEnemies));
+        _harmony.PatchAll(typeof(GreenDemonSpawner));
         _harmony.PatchAll(typeof(GrenadeDrones));
         _harmony.PatchAll(typeof(GrenadeDronePayload));
     }
