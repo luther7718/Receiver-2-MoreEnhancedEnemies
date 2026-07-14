@@ -137,6 +137,19 @@ public class Plugin : BaseUnityPlugin
             new ConfigDescription("Determines the color of some componenets of lancer turrets. For vanilla color use FFFFFFFF")
         );
 /////////////////////////////////////////////////////////////////////////////////////////////////
+        GrenadeDrones.chance = Config.Bind(
+            new ConfigDefinition("Grenade Drones", "Spawn chance"),
+            0.5f,
+            new ConfigDescription("Probability (0–1) that a drone spawns as a grenade drone.",
+            new AcceptableValueRange<float>(0f, 1f))
+        );
+
+        GrenadeDrones.lightColor = Config.Bind(
+            new ConfigDefinition("Grenade Drones", "Light color"),
+            new UnityEngine.Color(1f, 0f, 0f),
+            new ConfigDescription("Colour of the light on grenade drones.")
+        );
+/////////////////////////////////////////////////////////////////////////////////////////////////
         SleepyTurrets.overrideLevelStartAsleepChance = Config.Bind(
             new ConfigDefinition("Turret Sleep Control", "Override level start asleep chance"),
             false,
@@ -349,5 +362,7 @@ public class Plugin : BaseUnityPlugin
         _harmony.PatchAll(typeof(SleepySecurityCameras));
         _harmony.PatchAll(typeof(SecurityCameraLinkedEnemies));
         _harmony.PatchAll(typeof(GreenDemonSpawner));
+        _harmony.PatchAll(typeof(GrenadeDrones));
+        _harmony.PatchAll(typeof(GrenadeDronePayload));
     }
 }

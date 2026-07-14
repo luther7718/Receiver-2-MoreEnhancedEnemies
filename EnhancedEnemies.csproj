@@ -28,6 +28,9 @@
   </ItemGroup>
 
   <ItemGroup>
+  <Reference Include="SimpleJSON">
+    <HintPath></HintPath>
+  </Reference>
   <Reference Include="Wolfire.Receiver2">
     <HintPath></HintPath>
   </Reference>

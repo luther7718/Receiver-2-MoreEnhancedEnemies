@@ -1,11 +1,13 @@
 using BepInEx.Configuration;
 using HarmonyLib;
 using Receiver2;
+using SimpleJSON;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
 using VLB;
+using static HarmonyLib.AccessTools;
 
 namespace EnhancedEnemies.Patches
 {
@@ -711,6 +713,203 @@ namespace EnhancedEnemies.Patches
                 offset += LancerTurrets.GetInstructionSize((c.opcode));
             }
             return cm;*/
+        }
+    }
+
+    [HarmonyPatch]
+    public static class GrenadeDrones   //And so he says to me,
+    {   //You got legs baby, you're everywhere. You're all over the place! Yeah...
+        internal static ConfigEntry<float> chance;
+        internal static ConfigEntry<Color> lightColor;
+
+        //This is how we track which drones are grenade drones.
+        //I couldn't figure out how to do this with a HashSet like the existing patches,
+        //for some reason my drones would get re-rolled when just re-entering a cell. I found
+        //GetPersistentData and SetPersistentData in the ShockDrone code and it works pretty well.
+        public class Persist : MonoBehaviour {
+            public bool isGrenade;
+            public bool selfDestruct;   //This one isn't saved to JSON, just used for the fuse
+        }
+
+        //Reflection delegates allow us to access our robot's private parts
+        private static FieldRef<LightPart, RobotPart> lightPart = AccessTools.FieldRefAccess<LightPart, RobotPart>("part");
+        private static FieldRef<LightPart, LightPart.LightMode> lightMode = AccessTools.FieldRefAccess<LightPart, LightPart.LightMode>("current_light_mode");
+        private static FieldRef<LightPart, Color> lightCol = AccessTools.FieldRefAccess<LightPart, Color>("light_color");
+        //These are for changing behavior, grenade drones are slower but have a larger attack radius
+        private static FieldRef<ShockDrone, float> alertSpeed = AccessTools.FieldRefAccess<ShockDrone, float>("alert_speed");
+        private static FieldRef<SensorPart, float> sensorRange = AccessTools.FieldRefAccess<SensorPart, float>("range");
+
+        [HarmonyPostfix, HarmonyPatch(typeof(ShockDrone), "Start")]
+        static void OnSpawn(ShockDrone __instance)
+        {
+          /*
+             if ((ReceiverCoreScript.Instance().game_mode.GetGameMode() != GameMode.RankingCampaign))
+                && !Plugin.EnableClassic.Value)
+                return;
+          */
+
+            var persist = __instance.GetComponent<Persist>();
+            if (persist == null)
+            {   //Roll the dice to see if I'm a grenade drone...
+                persist = __instance.gameObject.AddComponent<Persist>();
+                persist.isGrenade = Random.value < chance.Value;
+            }
+
+            if (persist.isGrenade)
+            {   //and apply a speed penalty and range boost if so.
+                alertSpeed(__instance) *= 0.7f;
+                var sensor = __instance.sensor_part;
+                if (sensor != null) sensorRange(sensor) *= 1.5f;
+            }
+        }
+
+
+        [HarmonyPrefix, HarmonyPatch(typeof(LightPart), "UpdateLights")]
+        static void Colorize(LightPart __instance) //mod light_color like in the shotgun/lancer code
+        {
+            var robotPart = lightPart(__instance);
+            if (robotPart?.robot is ShockDrone drone && lightMode(__instance) == LightPart.LightMode.Passive)
+            {                                                   //If I'm a ShockDrone in a Passive state...
+                var persist = drone.GetComponent<Persist>();    //check my Persist component...
+                if (persist != null && persist.isGrenade)       //Am I a grenade drone?
+                    lightCol(__instance) = lightColor.Value;    //If so, override my color
+            }
+        }
+
+        //The special sauce, save the value of isGrenade directly to the drone's JSON
+        [HarmonyPostfix, HarmonyPatch(typeof(ShockDrone), "GetPersistentData")]
+        static void Save(ShockDrone __instance, ref JSONObject __result)
+        {
+            var persist = __instance.GetComponent<Persist>();
+            if (persist != null)
+                __result.Add("grenade", new JSONBool(persist.isGrenade));
+        }
+
+        //And retrieve it thusly. Persists across room loads and checkpoint loads
+        [HarmonyPostfix, HarmonyPatch(typeof(ShockDrone), "SetPersistentData")]
+        static void Load(ShockDrone __instance, JSONObject data)
+        {
+            if (data.HasKey("grenade"))
+            {
+                var persist = __instance.GetComponent<Persist>() ?? __instance.gameObject.AddComponent<Persist>();
+                persist.isGrenade = data["grenade"].AsBool;
+            }
+        }
+    }
+
+    [HarmonyPatch]
+    public static class GrenadeDronePayload
+    {
+        //Track exploded tasers by their instance ID.
+        //Using a HashSet here since the taser itself existing/not existing
+        //persists across room/checkpoint loads.
+        private static HashSet<int> _explodedTasers = new HashSet<int>();
+
+        [HarmonyPostfix]    //Grenade drones self-destruct once close enough to the player
+        [HarmonyPatch(typeof(ShockDrone), "AttackingEnter")]
+        static void OnSelfDestruct(ShockDrone __instance)
+        {
+            var persist = __instance.GetComponent<GrenadeDrones.Persist>();
+            if (persist == null || !persist.isGrenade) return;
+
+            var taser = __instance.taser_part;
+            if (taser == null) return;
+
+            persist.selfDestruct = true;
+
+            __instance.StartCoroutine(Fuse(__instance));
+        }
+        private static IEnumerator<WaitForSeconds> Fuse(ShockDrone drone)
+        {   //A short little fuse just to make it feel nicer
+            yield return new WaitForSeconds(0.6f);
+            TriggerGrenadeExplosion(drone, drone.taser_part);
+        }
+
+        [HarmonyPostfix]    //Or if you shoot their taser (pretend it's a grenade)
+        [HarmonyPatch(typeof(ShockDrone), "OnPartDestroyed")]
+        static void OnTaserDestroyed(ShockDrone __instance)
+        {
+            var persist = __instance.GetComponent<GrenadeDrones.Persist>();
+            if (persist == null || !persist.isGrenade) return;
+
+            var taser = __instance.taser_part;
+            if (taser == null) return;
+
+            Plugin.Logger.LogDebug("Drone taser destroyed, firing...");
+            TriggerGrenadeExplosion(__instance, taser);
+        }
+
+
+        //SURF'S UP, SPACE PONIES!
+        //I'M MAKIN' GRAVY WITHOUT THE LUMPS!
+        //AAAAAHAHAHAHAHAHA!
+        private static void TriggerGrenadeExplosion(ShockDrone drone, TaserPart taser)
+        {
+            if (drone == null || taser == null)
+            {
+                Plugin.Logger.LogInfo("Taser and/or drone are null... How did you get here?");
+                return;
+            }
+
+            //The duplicate explosion check is idempotent. Word of the Day.
+            int id = taser.GetInstanceID();
+            if (_explodedTasers.Contains(id))
+            {
+                Plugin.Logger.LogDebug($"Taser {id} already exploded, skipping.");
+                return;
+            }
+            _explodedTasers.Add(id);
+
+            //Did I self-destruct?
+            var persist = drone.GetComponent<GrenadeDrones.Persist>();
+            bool selfDestruct = persist != null && persist.selfDestruct;
+
+            Vector3 origin = taser.transform.position;
+
+            //Disable colliders so the pellets don't hit the taser itself
+            foreach (var col in taser.GetComponentsInChildren<Collider>())
+                col.enabled = false;
+
+            //Use .22 LR as the pellet spec (seems appropriate for shrapnel)
+            CartridgeSpec spec = new CartridgeSpec();
+            spec.SetFromPreset(CartridgeSpec.Preset._22_LR);
+
+            //Spawn 24-32 pellets. This number is arbitrary, I couldn't find any actual ballistic info
+            //on how many shrapnel fragments a grenade blast usually has. The old WW2 pineapple grenade
+            //had 40 squares scored into it, but didn't actually fragment along its scores apparently.
+            int pelletCount = UnityEngine.Random.Range(24, 32);
+            for (int i = 0; i < pelletCount; i++)
+            {
+                Vector3 finalDir;
+                if (selfDestruct && i == 0 && UnityEngine.Random.value < 0.6f)
+                {   //Aim first pellet at player if drone self‑destructed & player isn't lucky
+                    var player = LocalAimHandler.player_instance;
+                    if (player == null) continue;
+                    finalDir = (player.CenterPos() - origin).normalized * UnityEngine.Random.Range(0.8f, 1.2f);
+                }
+                else
+                {   //In all other conditions, fire pellets randomly
+                    finalDir = UnityEngine.Random.onUnitSphere * UnityEngine.Random.Range(0.1f, 1f);
+                }
+
+                BulletTrajectory trajectory = BulletTrajectoryManager.PlanTrajectory(
+                    origin,
+                    spec,
+                    finalDir,
+                    true
+                );
+
+                trajectory.draw_path = BulletTrajectoryManager.draw_debug_trajectory_path
+                    ? BulletTrajectory.DrawType.Debug
+                    : BulletTrajectory.DrawType.Tracer;
+
+                trajectory.bullet_source = drone.gameObject;
+                trajectory.bullet_source_entity_type = ReceiverEntityType.Drone;
+
+                BulletTrajectoryManager.ExecuteTrajectory(trajectory);
+            }
+
+            Plugin.Logger.LogDebug("Boom, baby, BOOM!");
         }
     }
 
