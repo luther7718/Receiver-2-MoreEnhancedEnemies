@@ -58,9 +58,78 @@ namespace EnhancedEnemies.Patches
                 && !Plugin.EnableClassic.Value)
                 return;
 
+            int normalWeight = weight.Value;
             int shotgunWeight = ShotgunTurrets.enabled.Value ? ShotgunTurrets.weight.Value : 0;
             int lancerWeight = LancerTurrets.enabled.Value ? LancerTurrets.weight.Value : 0;
-            int random = (int)(Random(TurretSeed(__instance), "Turret Main") * (weight.Value + shotgunWeight + lancerWeight));
+            //int random = (int)(Random(TurretSeed(__instance), "Turret Main") * (weight.Value + shotgunWeight + lancerWeight));
+
+            if (Plugin.NeoWeight.Value)
+            {   //New turret weighting system
+                bool ceiling = __instance.is_ceiling_mounted;
+                bool cutout = __instance.be_cutout;
+                bool armored = __instance.be_armored;
+
+                if (!ceiling)
+                {   //Floor turrets
+                    if (cutout && !armored)
+                    {   //Cutout
+                        normalWeight = 99;
+                        shotgunWeight = 0;
+                        lancerWeight = 0;
+                    }
+                    else if (!cutout && !armored)
+                    {   //Standard
+                        normalWeight = 66;
+                        shotgunWeight = 33;
+                        lancerWeight = 0;
+                    }
+                    else if (cutout && armored)
+                    {   //Cutout and armored (Idk if this can actually happen)
+                        normalWeight = 33;
+                        shotgunWeight = 66;
+                        lancerWeight = 0;
+                    }
+                    else if (armored && !cutout)
+                    {   //Armored
+                        normalWeight = 33;
+                        shotgunWeight = 33;
+                        lancerWeight = 33;
+                    }
+                    else {Plugin.Logger.LogInfo ("Knock it off, Fox!"); return;}
+                }
+                else if (ceiling)
+                {   //Ceiling turrets:
+                    if (cutout && !armored)
+                    {   //Cutout
+                        normalWeight = 66;
+                        shotgunWeight = 33;
+                        lancerWeight = 0;
+                    }
+                    else if (!cutout && !armored)
+                    {   //Standard
+                        normalWeight = 33;
+                        shotgunWeight = 33;
+                        lancerWeight = 33;
+                    }
+                    else if (cutout && armored)
+                    {   //Cutout and armored (idk if this can actually happen)
+                        normalWeight = 0;
+                        shotgunWeight = 33;
+                        lancerWeight = 66;
+                    }
+                    else if (armored && !cutout)
+                    {   //Armored
+                        normalWeight = 0;
+                        shotgunWeight = 0;
+                        lancerWeight = 99;
+                    }
+                    else {Plugin.Logger.LogInfo("Quit dinkin' around, Slip!"); return;}
+                }
+            }
+
+            int totalWeight = normalWeight + shotgunWeight + lancerWeight;
+            int random = (int)(Random(TurretSeed(__instance), "Turret Main") * totalWeight);
+
             //Plugin.Logger.LogInfo(random);
 
             if (random < shotgunWeight)
@@ -726,6 +795,7 @@ namespace EnhancedEnemies.Patches
         //I couldn't figure out how to do this with a HashSet like the existing patches,
         //for some reason my drones would get re-rolled when just re-entering a cell. I found
         //GetPersistentData and SetPersistentData in the ShockDrone code and it works pretty well.
+        //Oh I see now that the TurretSeed class is how it's done. Oh well, my way works too.
         public class Persist : MonoBehaviour {
             public bool isGrenade;
             public bool selfDestruct;   //This one isn't saved to JSON, just used for the fuse
@@ -751,8 +821,20 @@ namespace EnhancedEnemies.Patches
             var persist = __instance.GetComponent<Persist>();
             if (persist == null)
             {   //Roll the dice to see if I'm a grenade drone...
+                float grenadeChance;
+
                 persist = __instance.gameObject.AddComponent<Persist>();
-                persist.isGrenade = Random.value < chance.Value;
+                if (Plugin.NeoWeight.Value)
+                {   //New drone weighting system
+                    bool patrolling = __instance.follow_waypoints;
+
+                    if (!patrolling) {grenadeChance = 0.33f;
+                        Plugin.Logger.LogDebug ("Not patrolling");}
+                    else {grenadeChance = 0.66f;
+                        Plugin.Logger.LogDebug ("I'm patrolling");}
+                }
+                else {grenadeChance = chance.Value;}
+                persist.isGrenade = UnityEngine.Random.value < grenadeChance;
             }
 
             if (persist.isGrenade)

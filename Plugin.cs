@@ -13,6 +13,7 @@ public class Plugin : BaseUnityPlugin
     internal static new ManualLogSource Logger;
     private static Harmony _harmony;
     public static ConfigEntry<bool> EnableClassic;
+    public static ConfigEntry<bool> NeoWeight;
 
     private void Awake()
     {
@@ -20,7 +21,12 @@ public class Plugin : BaseUnityPlugin
         Logger = base.Logger;
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
-        
+
+        NeoWeight = Config.Bind(
+            new ConfigDefinition("Turrets", "Use new weight system"),
+            true,
+            new ConfigDescription("Use new hardcoded spawn values based on turret type")
+        );
         TurretMain.weight = Config.Bind(
             new ConfigDefinition("Turrets", "Regular turret chance weight"),
             33,
