@@ -1,8 +1,8 @@
 using BepInEx.Configuration;
 using HarmonyLib;
 using Receiver2;
+using Receiver2.Modifiers;
 using SimpleJSON;
-using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -65,7 +65,7 @@ namespace EnhancedEnemies.Patches
             int lancerWeight = LancerTurrets.enabled.Value ? LancerTurrets.weight.Value : 0;
             //int random = (int)(Random(TurretSeed(__instance), "Turret Main") * (weight.Value + shotgunWeight + lancerWeight));
 
-            if (Plugin.NeoWeight.Value)
+            if (Plugin.AutoWeight.Value)
             {   //New turret weighting system
                 bool ceiling = __instance.is_ceiling_mounted;
                 bool cutout = __instance.be_cutout;
@@ -797,12 +797,11 @@ namespace EnhancedEnemies.Patches
         internal static ConfigEntry<float> chance;
         
         public class Persist : MonoBehaviour {
-            public bool isGrenade;
-            public bool selfDestruct;   //This one isn't saved to JSON, just used for the fuse
-            public bool isGreenDemon;   //Likewise, this one isn't saved because the game handles it elsewhere
+            public bool isGrenade;      //This is the only one actually saved to the checkpoint data
+            public bool selfDestruct;
+            public bool isGreenDemon;
         }
 
-        //These are for changing behavior, grenade drones are slower but have a larger attack radius
         private static FieldRef<ShockDrone, float> alertSpeed = AccessTools.FieldRefAccess<ShockDrone, float>("alert_speed");
         private static FieldRef<SensorPart, float> sensorRange = AccessTools.FieldRefAccess<SensorPart, float>("range");
 
@@ -820,7 +819,7 @@ namespace EnhancedEnemies.Patches
                 persist = __instance.gameObject.AddComponent<Persist>();
 
                 if (kds != null && kds.kill_drone_type == ReceiverEntityType.GreenDemon)
-                {   //If I'm the Green Demon, skip the grenade drone roll.
+                {   //I'm the Green Demon, skip the grenade drone roll.
                     persist.isGrenade = false;
                     persist.isGreenDemon = true;
                 }
@@ -828,8 +827,8 @@ namespace EnhancedEnemies.Patches
                 {   //Otherwise, roll the dice to see if I'm a grenade drone...
                     float grenadeChance;
 
-                    if (Plugin.NeoWeight.Value)
-                    {   //New drone weighting system
+                    if (Plugin.AutoWeight.Value)
+                    {
                         bool patrolling = __instance.follow_waypoints;
 
                         if (patrolling) { grenadeChance = 0.66f; }
@@ -841,29 +840,28 @@ namespace EnhancedEnemies.Patches
             }
 
             if (persist.isGrenade)
-            {   //Grenade drones get a speed penalty but an attack radius boost.
-                alertSpeed(__instance) *= 0.7f; //70% as fast as a regular shock drone
+            {   //Grenade drone is 70% as fast as a standard shock drone, with a 1.5x attack range
+                alertSpeed(__instance) *= 0.7f;
                 var sensor = __instance.sensor_part;
                 if (sensor != null) sensorRange(sensor) *= 1.5f;
             }
 
             if (persist.isGreenDemon)
-            {   //The Green Demon gets an even sharper speed penalty.
-                alertSpeed(__instance) *= 0.4f; //40% speed, same ratio as R1 Green Demon
+            {   //Green Demon is only 40% as fast as a standard shock drone, same ratio as R1's demon
+                alertSpeed(__instance) *= 0.4f;
             }
         }
 
-        //The special sauce, save the value of isGrenade directly to the drone's JSON
-        //We don't do this for the Green Demon because the game has its own ways of tracking that
+        //Save grenade drone status to drone's persistent data...
         [HarmonyPostfix, HarmonyPatch(typeof(ShockDrone), "GetPersistentData")]
         static void Save(ShockDrone __instance, ref JSONObject __result)
         {
             var persist = __instance.GetComponent<Persist>();
             if (persist != null)
                 __result.Add("grenade", new JSONBool(persist.isGrenade));
-        }
+        }   //We only do this for grenade drones because the game itself handles this for the demon.
 
-        //And retrieve it thusly. Persists across room loads and checkpoint loads
+        //and retrieve it thusly. Persists across room loads and checkpoint loads
         [HarmonyPostfix, HarmonyPatch(typeof(ShockDrone), "SetPersistentData")]
         static void Load(ShockDrone __instance, JSONObject data)
         {
@@ -1011,23 +1009,32 @@ namespace EnhancedEnemies.Patches
     public static class GreenDemonMode
     {   //It's not easy, being green...
         internal static ConfigEntry<bool> enabled;
+        private static GreenDemonModifier _activeModifier;
 
         [HarmonyPostfix]
-        [HarmonyPatch(typeof(ReceiverCoreScript), "SpawnPlayer")]
-        static void SpawnPlayerPostfix(Vector3 position)
+        [HarmonyPatch(typeof(RankingProgressionGameMode), "StartLevel")]
+        static void ManageGDM(RankingProgressionGameMode __instance)
         {
-            if (!enabled.Value) return;
-
-            var rcs = ReceiverCoreScript.Instance();
-            if (rcs == null) return;
-
-            //Don't activate in Classic mode (I'll make a separate plugin later for that)
-            if (rcs.game_mode.GetGameMode() != GameMode.RankingCampaign) return;
-
-
-            if (!ModifierManager.HasModifier<Receiver2.Modifiers.GreenDemonModifier>())
+            if (!enabled.Value && _activeModifier != null)
             {
-                ModifierManager.AddModifier(new Receiver2.Modifiers.GreenDemonModifier());
+                ModifierManager.RemoveModifier(_activeModifier);
+                _activeModifier = null;
+            }
+            else if (enabled.Value && _activeModifier == null)
+            {
+                _activeModifier = new GreenDemonModifier();
+                ModifierManager.AddModifier(_activeModifier);
+            }
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(RankingProgressionGameMode), "OnDestroy")]
+        static void CleanupGDM()
+        {
+            if (_activeModifier != null)
+            {
+                ModifierManager.RemoveModifier(_activeModifier);
+                _activeModifier = null;
             }
         }
     }

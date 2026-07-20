@@ -13,7 +13,7 @@ public class Plugin : BaseUnityPlugin
     internal static new ManualLogSource Logger;
     private static Harmony _harmony;
     public static ConfigEntry<bool> EnableClassic;
-    public static ConfigEntry<bool> NeoWeight;
+    public static ConfigEntry<bool> AutoWeight;
 
     private void Awake()
     {
@@ -22,7 +22,7 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
 
-        NeoWeight = Config.Bind(
+        AutoWeight = Config.Bind(
             new ConfigDefinition("Turrets", "Use new weight system"),
             true,
             new ConfigDescription("Use new hardcoded spawn values based on turret type")
@@ -143,19 +143,23 @@ public class Plugin : BaseUnityPlugin
             new ConfigDescription("Determines the color of some componenets of lancer turrets. For vanilla color use FFFFFFFF")
         );
 /////////////////////////////////////////////////////////////////////////////////////////////////
-        GrenadeDrones.chance = Config.Bind(
+        DroneMain.chance = Config.Bind(
             new ConfigDefinition("Grenade Drones", "Spawn chance"),
             0.5f,
             new ConfigDescription("Probability (0–1) that a drone spawns as a grenade drone.",
-            new AcceptableValueRange<float>(0f, 1f))
+                new AcceptableValueRange<float>(0f, 1f))
         );
-
         GrenadeDrones.lightColor = Config.Bind(
             new ConfigDefinition("Grenade Drones", "Light color"),
             new UnityEngine.Color(1f, 0f, 1f),  //This is magenta because red is already taken by alert state
             new ConfigDescription("Color of the light on grenade drones.")
         );
-/////////////////////////////////////////////////////////////////////////////////////////////////
+        GreenDemonMode.enabled = Config.Bind(
+            new ConfigDefinition("Green Demon Mode", "Green Demon enabled"),
+            false,
+            new ConfigDescription("Try to rank up while evading a slow but invincible shock drone that can phase through walls")
+        );
+        /////////////////////////////////////////////////////////////////////////////////////////////////
         SleepyTurrets.overrideLevelStartAsleepChance = Config.Bind(
             new ConfigDefinition("Turret Sleep Control", "Override level start asleep chance"),
             false,
@@ -353,12 +357,6 @@ public class Plugin : BaseUnityPlugin
             new ConfigDescription("Enables security cameras to activate through other security cameras (they still need their own camera though)")
         );
 /////////////////////////////////////////////////////////////////////////////////////////////////
-        GreenDemonMode.enabled = Config.Bind(
-            new ConfigDefinition("Green Demon Mode", "Green Demon enabled"),
-            false,
-            new ConfigDescription("Try to rank up while evading a slow but invincible shock drone that can phase through walls")
-        );
-/////////////////////////////////////////////////////////////////////////////////////////////////
         EnableClassic = Config.Bind(
             new ConfigDefinition("Classic Mode", "Enhanced Enemies in Classic"),
             false,
@@ -373,12 +371,12 @@ public class Plugin : BaseUnityPlugin
         _harmony.PatchAll(typeof(LancerTurrets_BypassPenCheck));
         _harmony.PatchAll(typeof(LancerTurrets_SetAmmo));
         _harmony.PatchAll(typeof(LancerTurrets_LeadAfterVisionLoss));
+        _harmony.PatchAll(typeof(DroneMain));       //\
+        _harmony.PatchAll(typeof(GrenadeDrones));   // |L7718 
+        _harmony.PatchAll(typeof(GreenDemonMode));  ///
         _harmony.PatchAll(typeof(SleepyTurrets));
         _harmony.PatchAll(typeof(SleepyDrones));
         _harmony.PatchAll(typeof(SleepySecurityCameras));
         _harmony.PatchAll(typeof(SecurityCameraLinkedEnemies));
-        _harmony.PatchAll(typeof(GreenDemonMode));
-        _harmony.PatchAll(typeof(GrenadeDrones));
-        _harmony.PatchAll(typeof(GrenadeDronePayload));
     }
 }
